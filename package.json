@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "watch": "nodemon index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build:ui":"rm -rf build && cd ../full_stack_exercises/part2/puhelinluettelo && npm run build --prod && cp -r build ../../../full_stack_puhelinluettelo"
   },
   "repository": {
     "type": "git",
