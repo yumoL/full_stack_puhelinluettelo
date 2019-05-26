@@ -1,10 +1,11 @@
+require('dotenv').config()
 const express = require('express')
 const app = express()
 const bodyParser = require('body-parser')
-const morgan=require('morgan')
+const morgan = require('morgan')
 const cors = require('cors')
-
-morgan.token('body',function(req,res){return JSON.stringify(req.body)})
+const Person = require('./models/person')
+morgan.token('body', function (req, res) { return JSON.stringify(req.body) })
 
 app.use(express.static('build'))
 app.use(bodyParser.json())
@@ -12,74 +13,101 @@ app.use(cors())
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms :body'))
 
 
-let persons = [
-    {
-        "name": "Arto Hellas",
-        "number": "045-1236543",
-        "id": 1
-
-    },
-    {
-        "name": "Martti Tienari",
-        "number": "040-123456",
-        "id": 2
-    },
-    {
-        "name": "Arto Järvinen",
-        "number": "040-123456",
-        "id": 3
-    }
-]
-
-
 app.get('/api/persons', (req, res) => {
-    res.json(persons)
+    Person.find({}).then(persons => {
+        res.json(persons.map(p => p.toJSON()))
+    })
 })
 
-app.get('/info', (req, res) => {
-    const str = `<h2>Puhelinluettelossa ${persons.length} henkilön tiedot</h2>
+app.get('/api/persons/info', (req, res) => {
+    Person.find({}).then(persons => {
+        const str = `<h2>Puhelinluettelossa ${persons.length} henkilön tiedot</h2>
     <h2>${new Date()}</h2>`
-    res.send(str)
+        res.send(str)
+    })
+
 })
 
-app.get('/api/persons/:id', (req, res) => {
-    const id = Number(req.params.id)
-    const person = persons.find(p => p.id === id)
-    if (person) {
-        res.json(person)
-    } else {
-        res.status(400).end()
-    }
+app.get('/api/persons/:id', (req, res, next) => {
+    Person.findById(req.params.id).then(person => {
+        if (person) {
+            res.json(person.toJSON())
+        } else {
+            res.status(400).end()
+        }
+    })
+        .catch(error => next(error))
 })
 
-app.delete('/api/persons/:id', (req, res) => {
-    const id = Number(req.params.id)
-    persons = persons.filter(p => p.id !== id)
-    console.log(persons)
-    res.status(204).end()
+app.delete('/api/persons/:id', (req, res, next) => {
+    Person.findByIdAndRemove(req.params.id)
+        .then(result => {
+            res.status(204).end()
+        })
+        .catch(error => next(error))
 })
 
-app.post('/api/persons', (req, res) => {
+app.post('/api/persons', (req, res, next) => {
     const body = req.body
-    if (!body.name) {
+    if (body.name === undefined) {
         return res.status(400).json({ error: 'name missing' })
     }
-    if (!body.number) {
+    if (body.number === undefined) {
         return res.status(400).json({ error: 'number missing' })
     }
-    if (persons.find(p => p.name.toLowerCase() === body.name.toLowerCase())) {
-        return res.status(400).json({ error: 'name must be unique' })
-    }
+    const person = new Person({
+        name: body.name,
+        number: body.number,
+    })
+    person.save().then(savedPerson => {
+        res.json(savedPerson.toJSON())
+    })
+        .catch(error => next(error))
+})
+
+app.put('/api/persons/:id', (req, res, next) => {
+    const body = req.body
     const person = {
         name: body.name,
         number: body.number,
-        id: Math.floor(Math.random() * 1000)
     }
-    persons = persons.concat(person)
-    res.json(person)
+    Person.findByIdAndUpdate(req.params.id, person, { new: true })
+        .then(updatedPerson => {
+            res.json(updatedPerson.toJSON())
+        })
+        .catch(error => next(error))
 })
 
-const PORT = process.env.PORT || 3001
+const unknownEndpoint = (req, res) => {
+    res.status(400).send({ error: 'unknown endpoint' })
+}
+app.use(unknownEndpoint)
+
+const errorHandler = (error, req, res, next) => {
+    console.error(error.message)
+    if (error.name === 'CastError' && error.kind == 'ObjectId') {
+        return res.status(400).send({ error: 'malformatted id' })
+    }
+    if (error.name === 'ValidationError') {
+        const errors = error.errors
+        if (errors.name !== undefined) {
+            if (errors.name.kind == 'unique') {
+                return res.status(400).send({ error: 'name must be unique' })
+            }
+            if (errors.name.kind == 'minlength') {
+                return res.status(400).send({ error: 'name must have at least 3 characters' })
+            }
+        } else {
+            return res.status(400).send({ error: 'number must have at least 8 characters' })
+        }
+    }
+
+    next(error)
+}
+app.use(errorHandler)
+
+
+const PORT = process.env.PORT
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`)
 })
