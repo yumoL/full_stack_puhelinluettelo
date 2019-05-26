@@ -5,7 +5,7 @@ const bodyParser = require('body-parser')
 const morgan = require('morgan')
 const cors = require('cors')
 const Person = require('./models/person')
-morgan.token('body', function (req, res) { return JSON.stringify(req.body) })
+morgan.token('body', function (req) { return JSON.stringify(req.body) })
 
 app.use(express.static('build'))
 app.use(bodyParser.json())
@@ -41,7 +41,7 @@ app.get('/api/persons/:id', (req, res, next) => {
 
 app.delete('/api/persons/:id', (req, res, next) => {
     Person.findByIdAndRemove(req.params.id)
-        .then(result => {
+        .then(() => {
             res.status(204).end()
         })
         .catch(error => next(error))
@@ -85,16 +85,16 @@ app.use(unknownEndpoint)
 
 const errorHandler = (error, req, res, next) => {
     console.error(error.message)
-    if (error.name === 'CastError' && error.kind == 'ObjectId') {
+    if (error.name === 'CastError' && error.kind === 'ObjectId') {
         return res.status(400).send({ error: 'malformatted id' })
     }
     if (error.name === 'ValidationError') {
         const errors = error.errors
         if (errors.name !== undefined) {
-            if (errors.name.kind == 'unique') {
+            if (errors.name.kind === 'unique') {
                 return res.status(400).send({ error: 'name must be unique' })
             }
-            if (errors.name.kind == 'minlength') {
+            if (errors.name.kind === 'minlength') {
                 return res.status(400).send({ error: 'name must have at least 3 characters' })
             }
         } else {

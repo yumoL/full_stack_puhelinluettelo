@@ -1,7 +1,7 @@
 const mongoose = require('mongoose')
 
 if (process.argv.length < 3) {
-    console.log("Give password as argument")
+    console.log('Give password as argument')
     process.exit(1)
 }
 
@@ -25,7 +25,7 @@ if (process.argv.length === 5) {
         name: name,
         number: number
     })
-    person.save().then(res => {
+    person.save().then(() => {
         console.log(`Lisätään ${name} numero ${number} luetteloon`)
         mongoose.connection.close()
     })
